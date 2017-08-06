@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.Entity;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AskAppBackEnd.Core
@@ -19,7 +20,21 @@ namespace AskAppBackEnd.Core
             _dbContext = unitOfWork.DbContext;
         }
 
-        public T GetById(int id)
+        public virtual async Task<IEnumerable<T>> GetAsync(Func<IQueryable<T>, IQueryable<T>> queryShaper, CancellationToken cancellationToken)
+        {
+            var query = queryShaper(GetAll());
+            return await query.ToArrayAsync(cancellationToken);
+        }
+
+        public virtual async Task<TResult> GetAsync<TResult>(Func<IQueryable<T>, TResult> queryShaper, CancellationToken cancellationToken)
+        {
+            var set = GetAll();
+            var query = queryShaper;
+            var factory = Task<TResult>.Factory;
+            return await factory.StartNew(() => query(set), cancellationToken);
+        }
+
+        public T GetById(Guid id)
         {
             return _dbset.Find(id);
         }
@@ -52,6 +67,11 @@ namespace AskAppBackEnd.Core
         public void Save()
         {
             _unitOfWork.Save();
+        }
+
+        public async Task<int> SaveAsync()
+        {
+            return await _unitOfWork.SaveAsync();
         }
     }
 }

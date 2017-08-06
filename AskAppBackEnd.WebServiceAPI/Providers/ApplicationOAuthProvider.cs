@@ -57,6 +57,9 @@ namespace AskAppBackEnd.WebServiceAPI.Providers
                 context.AdditionalResponseParameters.Add(property.Key, property.Value);
             }
 
+            //return userid
+            context.AdditionalResponseParameters.Add("UserId", context.Identity.GetUserId());
+
             return Task.FromResult<object>(null);
         }
 

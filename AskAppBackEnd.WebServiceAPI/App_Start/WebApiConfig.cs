@@ -31,7 +31,6 @@ namespace AskAppBackEnd
             var container = builder.Build();
             config.DependencyResolver = new AutofacWebApiDependencyResolver(container);
 
-
             config.Count().Filter().OrderBy().Expand().Select().MaxTop(null);
             config.MapODataServiceRoute("odata", "odata", GetEdmModel());
 

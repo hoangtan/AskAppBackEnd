@@ -10,12 +10,13 @@ using System.Web.Http.ModelBinding;
 using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.EntityFramework;
 using Microsoft.AspNet.Identity.Owin;
-using Microsoft.Owin.Security;  
+using Microsoft.Owin.Security;
 using Microsoft.Owin.Security.Cookies;
 using Microsoft.Owin.Security.OAuth;
 using AskAppBackEnd.WebServiceAPI.Models;
 using AskAppBackEnd.WebServiceAPI.Providers;
 using AskAppBackEnd.WebServiceAPI.Results;
+using AskAppBackEnd.Services;
 
 namespace AskAppBackEnd.WebServiceAPI.Controllers
 {
@@ -26,8 +27,12 @@ namespace AskAppBackEnd.WebServiceAPI.Controllers
         private const string LocalLoginProvider = "Local";
         private ApplicationUserManager _userManager;
 
-        public AccountController()
+        private readonly IUserService _userService;
+        private readonly IUtilityService _utilityService;
+        public AccountController(IUserService userService, IUtilityService utilityService)
         {
+            _userService = userService;
+            _utilityService = utilityService;
         }
 
         public AccountController(ApplicationUserManager userManager,
@@ -115,6 +120,7 @@ namespace AskAppBackEnd.WebServiceAPI.Controllers
         }
 
         // POST api/Account/ChangePassword
+
         [Route("ChangePassword")]
         public async Task<IHttpActionResult> ChangePassword(ChangePasswordBindingModel model)
         {
@@ -135,6 +141,7 @@ namespace AskAppBackEnd.WebServiceAPI.Controllers
         }
 
         // POST api/Account/SetPassword
+        [AllowAnonymous]
         [Route("SetPassword")]
         public async Task<IHttpActionResult> SetPassword(SetPasswordBindingModel model)
         {
@@ -143,12 +150,52 @@ namespace AskAppBackEnd.WebServiceAPI.Controllers
                 return BadRequest(ModelState);
             }
 
-            IdentityResult result = await UserManager.AddPasswordAsync(new Guid(User.Identity.GetUserId()), model.NewPassword);
+            //check reset password token valid
+            var resetTicket = await _userService.GetResetTicketIfTokenValidAsync(model.Token);
+            if (resetTicket == null)
+                return BadRequest("Token is invalid. Please contact system administration for further assistance.");
+
+            IdentityResult result = await UserManager.AddPasswordAsync(resetTicket.UserId.Value, model.NewPassword);
 
             if (!result.Succeeded)
             {
                 return GetErrorResult(result);
             }
+
+            //mark reset ticket as used
+            await _userService.MarkResetTicketAsUsed(resetTicket.Id);
+
+            return Ok();
+        }
+
+        // POST api/Account/ForgotPassword
+        [AllowAnonymous]
+        [Route("ForgotPassword")]
+        [HttpPost]
+        public async Task<IHttpActionResult> ForgotPassword(ForgotPasswordBindingModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            //Check user with email
+            var user = await _userService.GetUserByEmailAsync(model.Email);
+            if (user == null)
+                return BadRequest("Email is not available in system. Please contact system administration for further assistance.");
+
+            //Create reset ticket
+            var resetTicket = await _userService.CreateResetTicketAsync(user.Id);
+            if (resetTicket == null)
+                return BadRequest("Could not generate reset password ticket. Please contact system administration for further assistance.");
+
+            //Create email content
+            string filepath = String.Format(@"{0}{1}", AppDomain.CurrentDomain.BaseDirectory, @"EmailTemplates\ResetPassword.html");
+            string content = System.IO.File.ReadAllText(filepath);
+            content = content.Replace("[ResetPasswordToken]", resetTicket.TokenHash);
+
+            //Send email
+            _utilityService.SendEmail(model.Email, content);
 
             return Ok();
         }

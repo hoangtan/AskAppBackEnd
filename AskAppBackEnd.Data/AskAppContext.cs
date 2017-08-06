@@ -25,6 +25,7 @@ namespace AskAppBackEnd.Data
         public virtual DbSet<UserPreference> UserPreferences { get; set; }
         public virtual DbSet<UserResponse> UserResponses { get; set; }
         public virtual DbSet<User> Users { get; set; }
+        public virtual DbSet<ResetTicket> ResetTickets { get; set; }
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {

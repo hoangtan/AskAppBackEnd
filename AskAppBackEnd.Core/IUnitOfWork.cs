@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data.Entity;
+using System.Threading.Tasks;
 
 namespace AskAppBackEnd.Core
 {
@@ -8,6 +9,6 @@ namespace AskAppBackEnd.Core
         DbContext DbContext { get; }
         DbSet<T> Set<T>() where T : class;
         void Save();
-
+        Task<int> SaveAsync();
     }
 }
